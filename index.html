@@ -114,10 +114,10 @@ tbody tr:hover td{background:rgba(59,130,246,.04);color:var(--text)}
         Merge CSV
       </label>
       <input type="file" id="csvMerge" accept=".csv,.tsv,.txt" style="display:none">
-      <label class="upload-btn" for="csvReplace" title="Replace all data with this file" style="opacity:.7">
+      <button class="upload-btn" onclick="requestReplace()" title="Replace all data with this file (password required)" style="opacity:.7">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
         Replace
-      </label>
+      </button>
       <input type="file" id="csvReplace" accept=".csv,.tsv,.txt" style="display:none">
       <button class="upload-btn" onclick="exportCSV()" title="Download current data as CSV">
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
@@ -627,6 +627,24 @@ document.getElementById('csvMerge').addEventListener('change', function(e){
   if(e.target.files[0]) handleCSV(e.target.files[0], 'merge');
   e.target.value = '';
 });
+
+// ======================== REPLACE PASSWORD ========================
+const REPLACE_PASSWORD = 'altron2026';
+
+function requestReplace(){
+  const pw = prompt('This will DELETE all existing data.\n\nEnter the admin password to continue:');
+  if(pw === null) return;
+  if(pw !== REPLACE_PASSWORD){
+    showToast('Incorrect password — Replace cancelled');
+    return;
+  }
+  const confirm2 = prompt('Are you sure? Type REPLACE to confirm:');
+  if(confirm2 !== 'REPLACE'){
+    showToast('Replace cancelled');
+    return;
+  }
+  document.getElementById('csvReplace').click();
+}
 
 document.getElementById('csvReplace').addEventListener('change', function(e){
   if(e.target.files[0]) handleCSV(e.target.files[0], 'replace');
