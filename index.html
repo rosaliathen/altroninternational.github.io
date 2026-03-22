@@ -721,71 +721,80 @@ function isSupabaseConfigured(){
   return SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_KEY !== 'YOUR_SUPABASE_ANON_KEY';
 }
 
-async function handleCSV(file, mode){
-  // Read file first, then process
-  const text = await file.text();
-  const results = Papa.parse(text, {
-    header: true,
-    skipEmptyLines: true,
-    delimiter: '',  // auto-detect
-  });
-  
-  if(!results.data || results.data.length === 0){
-    showToast('Error: CSV is empty or could not be parsed');
-    console.error('Parse result:', results);
-    return;
-  }
-  
-  console.log('Parsed', results.data.length, 'rows. Fields:', results.meta.fields);
-  console.log('Delimiter detected:', JSON.stringify(results.meta.delimiter));
-  
-  const newRows = results.data.map(normalizeRow);
-  console.log('Sample cleaned row:', JSON.stringify(newRows[0]));
+function handleCSV(file, mode){
+  showToast('Reading file...');
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const text = e.target.result;
+    console.log('File read OK, length:', text.length);
+    
+    const results = Papa.parse(text, {
+      header: true,
+      skipEmptyLines: true,
+    });
+    
+    if(!results.data || results.data.length === 0){
+      showToast('Error: CSV is empty or could not be parsed');
+      console.error('Parse errors:', results.errors);
+      return;
+    }
+    
+    console.log('Parsed', results.data.length, 'rows. Delimiter:', JSON.stringify(results.meta.delimiter), 'Fields:', results.meta.fields);
+    
+    const newRows = results.data.map(normalizeRow);
+    console.log('Sample cleaned row:', JSON.stringify(newRows[0]));
 
-  if(isSupabaseConfigured()){
-    try {
-      showToast('Saving to server...');
-      let count;
-      if(mode === 'replace'){
-        count = await replaceAllData(newRows);
-        if(count !== false) showToast('Replaced: ' + count + ' records saved to server');
-        else showToast('Error during replace — check browser console (F12)');
-      } else {
-        count = await upsertRows(newRows);
-        if(count !== false) showToast('Merged: ' + count + ' records synced to server');
-        else showToast('Error during merge — check browser console (F12)');
-      }
-      await loadAllData();
-    } catch(e){
-      console.error('handleCSV error:', e);
-      showToast('Error: ' + e.message);
-    }
-  } else {
-    if(mode === 'replace'){
-      DATA = newRows;
-      showToast('Replaced: ' + DATA.length + ' records (local only)');
+    if(isSupabaseConfigured()){
+      showToast('Saving ' + newRows.length + ' rows to server...');
+      const doSupabase = async () => {
+        try {
+          let count;
+          if(mode === 'replace'){
+            count = await replaceAllData(newRows);
+            if(count !== false) showToast('Replaced: ' + count + ' records saved');
+            else showToast('Error during replace — open console (F12)');
+          } else {
+            count = await upsertRows(newRows);
+            if(count !== false) showToast('Merged: ' + count + ' records synced');
+            else showToast('Error during merge — open console (F12)');
+          }
+          await loadAllData();
+        } catch(err){
+          console.error('Supabase error:', err);
+          showToast('Server error: ' + err.message);
+        }
+      };
+      doSupabase();
     } else {
-      const map = new Map();
-      DATA.forEach(r => map.set(getRowKey(r), r));
-      let added = 0, updated = 0;
-      newRows.forEach(r => {
-        const key = getRowKey(r);
-        if(map.has(key)){ map.set(key, r); updated++; }
-        else { map.set(key, r); added++; }
-      });
-      DATA = Array.from(map.values());
-      showToast('Merged: ' + added + ' added, ' + updated + ' updated — ' + DATA.length + ' total (local only)');
+      if(mode === 'replace'){
+        DATA = newRows;
+        showToast('Replaced: ' + DATA.length + ' records (local only)');
+      } else {
+        const map = new Map();
+        DATA.forEach(r => map.set(getRowKey(r), r));
+        let added = 0, updated = 0;
+        newRows.forEach(r => {
+          const key = getRowKey(r);
+          if(map.has(key)){ map.set(key, r); updated++; }
+          else { map.set(key, r); added++; }
+        });
+        DATA = Array.from(map.values());
+        showToast('Merged: ' + added + ' added, ' + updated + ' updated — ' + DATA.length + ' total (local only)');
+      }
+      saveToStorage();
+      document.getElementById('lastUpdate').textContent = DATA.length + ' records';
+      buildFilters();
+      render();
     }
-    saveToStorage();
-    document.getElementById('lastUpdate').textContent = DATA.length + ' records';
-    buildFilters();
-    render();
-  }
+  };
+  reader.onerror = function(){ showToast('Error reading file'); };
+  reader.readAsText(file, 'UTF-8');
 }
 
-document.getElementById('csvMerge').addEventListener('change', async function(e){
-  if(e.target.files[0]) await handleCSV(e.target.files[0], 'merge');
+document.getElementById('csvMerge').addEventListener('change', function(e){
+  const file = e.target.files[0];
   e.target.value = '';
+  if(file) handleCSV(file, 'merge');
 });
 
 // ======================== REPLACE PASSWORD ========================
@@ -806,9 +815,10 @@ function requestReplace(){
   document.getElementById('csvReplace').click();
 }
 
-document.getElementById('csvReplace').addEventListener('change', async function(e){
-  if(e.target.files[0]) await handleCSV(e.target.files[0], 'replace');
+document.getElementById('csvReplace').addEventListener('change', function(e){
+  const file = e.target.files[0];
   e.target.value = '';
+  if(file) handleCSV(file, 'replace');
 });
 
 function exportCSV(){
