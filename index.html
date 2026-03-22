@@ -109,11 +109,20 @@ tbody tr:hover td{background:rgba(59,130,246,.04);color:var(--text)}
     <h1><span>●</span> Avances de Proyectos v2</h1>
     <div class="header-right">
       <div class="badge" id="lastUpdate">91 records</div>
-      <label class="upload-btn" for="csvInput">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5-5v12"/></svg>
-        Update CSV
+      <label class="upload-btn" for="csvMerge" title="Merge new rows into existing data (match by Case # + Item)">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+        Merge CSV
       </label>
-      <input type="file" id="csvInput" accept=".csv,.tsv,.txt">
+      <input type="file" id="csvMerge" accept=".csv,.tsv,.txt" style="display:none">
+      <label class="upload-btn" for="csvReplace" title="Replace all data with this file" style="opacity:.7">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        Replace
+      </label>
+      <input type="file" id="csvReplace" accept=".csv,.tsv,.txt" style="display:none">
+      <button class="upload-btn" onclick="exportCSV()" title="Download current data as CSV">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5m0 0l5-5m-5 5V4"/></svg>
+        Export
+      </button>
     </div>
   </div>
 
@@ -403,39 +412,92 @@ function renderTable(d){
   }).join('');
 }
 
-// ======================== CSV UPLOAD ========================
-document.getElementById('csvInput').addEventListener('change', function(e){
-  const file = e.target.files[0];
-  if(!file) return;
+// ======================== CSV PROCESSING ========================
+function normalizeRow(r){
+  const row = {};
+  Object.keys(r).forEach(k => { row[k.trim()] = r[k]; });
+  if(row['Empresa que cotiza'] === 'A Int.') row['Empresa que cotiza'] = 'A. Int';
+  ['Cantidad','Costo compra','CC Extendido','PV ofrecido','PV Extendido','Margen %','Antigüedad'].forEach(f => {
+    if(row[f] !== undefined) row[f] = parseFloat(row[f]) || 0;
+  });
+  return row;
+}
+
+function getRowKey(r){ return (r['Case #']||'') + '||' + (r['Item']||''); }
+
+function mergeData(existingData, newRows){
+  const map = new Map();
+  existingData.forEach(r => map.set(getRowKey(r), r));
+  let added = 0, updated = 0;
+  newRows.forEach(r => {
+    const key = getRowKey(r);
+    if(map.has(key)){ map.set(key, r); updated++; }
+    else { map.set(key, r); added++; }
+  });
+  return { data: Array.from(map.values()), added, updated };
+}
+
+function saveToStorage(){ 
+  try { localStorage.setItem('dashboard_avances_data', JSON.stringify(DATA)); } catch(e){} 
+}
+
+function loadFromStorage(){
+  try {
+    const stored = localStorage.getItem('dashboard_avances_data');
+    if(stored){ const parsed = JSON.parse(stored); if(parsed && parsed.length > 0) return parsed; }
+  } catch(e){}
+  return null;
+}
+
+function handleCSV(file, mode){
   Papa.parse(file, {
     header: true,
     skipEmptyLines: true,
     complete: function(results){
-      if(results.data && results.data.length > 0){
-        // Normalize field names
-        DATA = results.data.map(r => {
-          const row = {};
-          Object.keys(r).forEach(k => {
-            const clean = k.trim();
-            row[clean] = r[k];
-          });
-          // Normalize company name
-          if(row['Empresa que cotiza'] === 'A Int.') row['Empresa que cotiza'] = 'A. Int';
-          // Ensure numeric fields
-          ['Cantidad','Costo compra','CC Extendido','PV ofrecido','PV Extendido','Margen %','Antigüedad'].forEach(f => {
-            if(row[f] !== undefined) row[f] = parseFloat(row[f]) || 0;
-          });
-          return row;
-        });
-        document.getElementById('lastUpdate').textContent = DATA.length + ' records';
-        buildFilters();
-        render();
-        showToast(`Updated: ${DATA.length} records loaded`);
+      if(!results.data || results.data.length === 0) return;
+      const newRows = results.data.map(normalizeRow);
+
+      if(mode === 'replace'){
+        DATA = newRows;
+        showToast(`Replaced: ${DATA.length} records loaded`);
+      } else {
+        const result = mergeData(DATA, newRows);
+        DATA = result.data;
+        showToast(`Merged: ${result.added} added, ${result.updated} updated — ${DATA.length} total`);
       }
+
+      saveToStorage();
+      document.getElementById('lastUpdate').textContent = DATA.length + ' records';
+      buildFilters();
+      render();
     }
   });
+}
+
+document.getElementById('csvMerge').addEventListener('change', function(e){
+  if(e.target.files[0]) handleCSV(e.target.files[0], 'merge');
   e.target.value = '';
 });
+
+document.getElementById('csvReplace').addEventListener('change', function(e){
+  if(e.target.files[0]) handleCSV(e.target.files[0], 'replace');
+  e.target.value = '';
+});
+
+function exportCSV(){
+  if(DATA.length === 0) return;
+  const headers = Object.keys(DATA[0]);
+  const csv = [headers.join(','), ...DATA.map(r => headers.map(h => {
+    let v = r[h] === undefined ? '' : String(r[h]);
+    if(v.includes(',') || v.includes('"') || v.includes('\n')) v = '"' + v.replace(/"/g,'""') + '"';
+    return v;
+  }).join(','))].join('\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'avances_proyectos_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+}
 
 function showToast(msg){
   const t = document.getElementById('toast');
@@ -445,6 +507,8 @@ function showToast(msg){
 }
 
 // ======================== INIT ========================
+const stored = loadFromStorage();
+if(stored){ DATA = stored; document.getElementById('lastUpdate').textContent = DATA.length + ' records'; }
 buildFilters();
 render();
 </script>
