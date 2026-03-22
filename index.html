@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Avances de Proyectos v2</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--bg:#0B0F19;--bg2:#111827;--card:#1A1F2E;--card-border:#252B3B;
+--text:#F0F0F0;--text2:#94A3B8;--text3:#64748B;
+--green:#22C55E;--green-bg:rgba(34,197,94,.1);
+--blue:#3B82F6;--blue-bg:rgba(59,130,246,.1);
+--amber:#F59E0B;--amber-bg:rgba(245,158,11,.1);
+--red:#EF4444;--red-bg:rgba(239,68,68,.1);
+--purple:#A78BFA;--purple-bg:rgba(167,139,250,.1);
+--font:'DM Sans',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;
+--radius:12px;--radius-sm:8px;
+}
+html{font-size:15px}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+.app{max-width:1380px;margin:0 auto;padding:24px 28px 40px}
+
+/* Header */
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:16px}
+.header h1{font-size:1.5rem;font-weight:600;letter-spacing:-.02em}
+.header h1 span{color:var(--blue);font-weight:700}
+.header-right{display:flex;align-items:center;gap:12px}
+.badge{font-size:.7rem;font-family:var(--mono);padding:5px 12px;border-radius:20px;background:var(--green-bg);color:var(--green);font-weight:500;letter-spacing:.03em}
+.upload-btn{display:flex;align-items:center;gap:6px;padding:8px 18px;border-radius:var(--radius-sm);border:1px solid var(--card-border);background:var(--card);color:var(--text);font-family:var(--font);font-size:.82rem;font-weight:500;cursor:pointer;transition:all .2s}
+.upload-btn:hover{border-color:var(--blue);background:var(--blue-bg)}
+.upload-btn svg{width:16px;height:16px}
+#csvInput{display:none}
+
+/* Filters */
+.filters{display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap}
+.filter-select{padding:7px 14px;border-radius:var(--radius-sm);border:1px solid var(--card-border);background:var(--card);color:var(--text2);font-family:var(--font);font-size:.78rem;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2364748B' stroke-width='1.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px;transition:border-color .2s}
+.filter-select:hover,.filter-select:focus{border-color:var(--blue);outline:none}
+
+/* KPIs */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:24px}
+.kpi{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);padding:20px 22px;position:relative;overflow:hidden;transition:border-color .25s}
+.kpi:hover{border-color:var(--blue)}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kpi:nth-child(1)::before{background:linear-gradient(90deg,var(--blue),transparent)}
+.kpi:nth-child(2)::before{background:linear-gradient(90deg,var(--green),transparent)}
+.kpi:nth-child(3)::before{background:linear-gradient(90deg,var(--amber),transparent)}
+.kpi:nth-child(4)::before{background:linear-gradient(90deg,var(--purple),transparent)}
+.kpi:nth-child(5)::before{background:linear-gradient(90deg,var(--red),transparent)}
+.kpi-label{font-size:.72rem;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;font-weight:500;margin-bottom:8px}
+.kpi-value{font-size:1.65rem;font-weight:700;letter-spacing:-.03em;line-height:1.1}
+.kpi-sub{font-size:.72rem;color:var(--text3);margin-top:6px;font-family:var(--mono)}
+
+/* Charts grid */
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.chart-card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);padding:22px 24px}
+.chart-card h3{font-size:.85rem;font-weight:600;margin-bottom:16px;color:var(--text)}
+.chart-wrap{position:relative;height:260px}
+.chart-card.full{grid-column:1/-1}
+
+/* Status pipeline */
+.pipeline{display:flex;flex-direction:column;gap:12px}
+.pipe-item{display:flex;align-items:center;gap:14px}
+.pipe-label{width:180px;font-size:.78rem;color:var(--text2);flex-shrink:0;text-align:right}
+.pipe-track{flex:1;height:28px;background:var(--bg2);border-radius:6px;overflow:hidden;position:relative}
+.pipe-fill{height:100%;border-radius:6px;display:flex;align-items:center;justify-content:flex-end;padding-right:10px;font-size:.7rem;font-weight:600;color:#fff;font-family:var(--mono);transition:width .6s ease}
+.pipe-count{min-width:30px;text-align:center;font-size:.78rem;font-weight:600;font-family:var(--mono);color:var(--text)}
+
+/* Table */
+.table-wrap{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);overflow:hidden;margin-bottom:16px}
+.table-wrap h3{font-size:.85rem;font-weight:600;padding:18px 22px 0;color:var(--text)}
+.table-scroll{overflow-x:auto;padding:14px 22px 18px}
+table{width:100%;border-collapse:collapse;font-size:.75rem}
+thead th{text-align:left;padding:10px 12px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.05em;font-size:.68rem;border-bottom:1px solid var(--card-border);white-space:nowrap}
+tbody td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);color:var(--text2);white-space:nowrap}
+tbody tr:hover td{background:rgba(59,130,246,.04);color:var(--text)}
+.status-tag{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.68rem;font-weight:500}
+.status-cotizado{background:var(--green-bg);color:var(--green)}
+.status-costeado{background:var(--blue-bg);color:var(--blue)}
+.status-rfq{background:var(--amber-bg);color:var(--amber)}
+.status-solicitada{background:var(--red-bg);color:var(--red)}
+
+/* Responsive */
+@media(max-width:900px){
+.charts-row{grid-template-columns:1fr}
+.kpi-row{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:550px){
+.kpi-row{grid-template-columns:1fr}
+.pipe-label{width:100px;font-size:.7rem}
+}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--green);color:#fff;padding:12px 22px;border-radius:var(--radius-sm);font-size:.82rem;font-weight:500;transform:translateY(80px);opacity:0;transition:all .35s;z-index:99}
+.toast.show{transform:translateY(0);opacity:1}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--card-border);border-radius:3px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1><span>●</span> Avances de Proyectos v2</h1>
+    <div class="header-right">
+      <div class="badge" id="lastUpdate">91 records</div>
+      <label class="upload-btn" for="csvInput">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5-5m0 0l5 5m-5-5v12"/></svg>
+        Update CSV
+      </label>
+      <input type="file" id="csvInput" accept=".csv,.tsv,.txt">
+    </div>
+  </div>
+
+  <div class="filters" id="filters"></div>
+
+  <div class="kpi-row" id="kpis"></div>
+
+  <div class="charts-row">
+    <div class="chart-card">
+      <h3>Pipeline by status</h3>
+      <div class="pipeline" id="pipeline"></div>
+    </div>
+    <div class="chart-card">
+      <h3>PV by company</h3>
+      <div class="chart-wrap"><canvas id="chartPV"></canvas></div>
+    </div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-card">
+      <h3>Monthly PV trend</h3>
+      <div class="chart-wrap"><canvas id="chartTrend"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h3>Top categories</h3>
+      <div class="chart-wrap"><canvas id="chartCat"></canvas></div>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <h3>Detail — All lines</h3>
+    <div class="table-scroll">
+      <table><thead id="thead"></thead><tbody id="tbody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ======================== DATA ========================
+const INITIAL_DATA = [{"Fecha creacion":"2025-09-21","Empresa que cotiza":"AT RD","Case #":"Case-2487","Oportunidad":"Homs Health And Wellness SRL","Categoria":"Letrero Plastico","Incoterm":"DDP","Item":"H-6959","Descripcion":"Clearance Bar","Cantidad":1,"Costo compra":200.29,"CC Extendido":200.29,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Costeado","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"septiembre","Trimestre":"Q3"},{"Fecha creacion":"2025-09-28","Empresa que cotiza":"AT RD","Case #":"Case-2557","Oportunidad":"Excellence El carmen","Categoria":"Memoria/Almacenamiento","Incoterm":"DDP","Item":"WD180PURZ","Descripcion":"Drive HDD Western Digital 18TB SATA","Cantidad":50,"Costo compra":464.45,"CC Extendido":23222.5,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Costeado","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"septiembre","Trimestre":"Q3"},{"Fecha creacion":"2025-09-28","Empresa que cotiza":"AT RD","Case #":"Case-2557","Oportunidad":"Excellence Punt Cana","Categoria":"Licencia LG","Incoterm":"DDP","Item":"PCD-30LL","Descripcion":"PCD-30LL - Pro:Centric Client License [Perpetual]","Cantidad":200,"Costo compra":69,"CC Extendido":13800,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Costeado","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"septiembre","Trimestre":"Q3"},{"Fecha creacion":"2025-09-28","Empresa que cotiza":"AT RD","Case #":"Case-2557","Oportunidad":"Excellence El carmen","Categoria":"TV","Incoterm":"DDP","Item":"55UM777H","Descripcion":"TV LG 55\" Modelo (55UM777H)","Cantidad":230,"Costo compra":686.55,"CC Extendido":157906.5,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Costeado","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"septiembre","Trimestre":"Q3"},{"Fecha creacion":"2025-09-28","Empresa que cotiza":"AT RD","Case #":"Case-2557","Oportunidad":"Excellence El carmen","Categoria":"Memoria/Almacenamiento","Incoterm":"DDP","Item":"ST20000VE002","Descripcion":"SEAGATE SKYHAWK Ai 20TB VIDEO OPTIMIZED DRIVE","Cantidad":50,"Costo compra":499.99,"CC Extendido":24999.5,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Costeado","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"septiembre","Trimestre":"Q3"},{"Fecha creacion":"2025-10-04","Empresa que cotiza":"AT RD","Case #":"Case-2560","Oportunidad":"Excellence Punta Cana","Categoria":"Ethernet Tester","Incoterm":"DDP","Item":"LR10G-200","Descripcion":"NETALLY LINK RUNNER 10G","Cantidad":1,"Costo compra":0,"CC Extendido":0,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Costeado","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"octubre","Trimestre":"Q4"},{"Fecha creacion":"2025-10-04","Empresa que cotiza":"AT RD","Case #":"Case-2560","Oportunidad":"Excellence Punt Cana","Categoria":"TV","Incoterm":"DDP","Item":"55UM777H","Descripcion":"TV LG 55\" Modelo (55UM777H)","Cantidad":200,"Costo compra":674,"CC Extendido":134800,"PV ofrecido":900,"PV Extendido":180000,"Margen %":0.0002,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-10-09","Antigüedad":5,"Mes":"octubre","Trimestre":"Q4"},{"Fecha creacion":"2025-10-04","Empresa que cotiza":"AT RD","Case #":"Case-2560","Oportunidad":"Excellence El carmen","Categoria":"Local","Incoterm":"DDP","Item":"PCD-30LL","Descripcion":"PCD-30LL - Pro:Centric Client License [Perpetual]","Cantidad":230,"Costo compra":69,"CC Extendido":15870,"PV ofrecido":90,"PV Extendido":20700,"Margen %":0.233,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-10-09","Antigüedad":5,"Mes":"octubre","Trimestre":"Q4"},{"Fecha creacion":"2025-10-04","Empresa que cotiza":"AT RD","Case #":"Case-2560","Oportunidad":"Excellence Punta Cana","Categoria":"Memoria/Almacenamiento","Incoterm":"DDP","Item":"ST20000VE002","Descripcion":"SEAGATE SKYHAWK Ai 20TB VIDEO OPTIMIZED DRIVE","Cantidad":50,"Costo compra":499.99,"CC Extendido":24999.5,"PV ofrecido":668,"PV Extendido":33400,"Margen %":0.199,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-10-09","Antigüedad":5,"Mes":"octubre","Trimestre":"Q4"},{"Fecha creacion":"2025-10-04","Empresa que cotiza":"AT RD","Case #":"Case-2560","Oportunidad":"Excellence Punta Cana","Categoria":"Memoria/Almacenamiento","Incoterm":"DDP","Item":"WD180PURZ","Descripcion":"WD Purple WD180PURZ 18TB 7200 RPM SATA","Cantidad":50,"Costo compra":464.45,"CC Extendido":23222.5,"PV ofrecido":622,"PV Extendido":31100,"Margen %":0.199,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-10-09","Antigüedad":5,"Mes":"octubre","Trimestre":"Q4"},{"Fecha creacion":"2025-10-11","Empresa que cotiza":"AT RD","Case #":"Case-2573","Oportunidad":"Inversiones Coconut","Categoria":"Local","Incoterm":"DDP","Item":"CROSS BAR 75 gris","Descripcion":"Taburete CROSS BAR 75 color GRIS","Cantidad":8,"Costo compra":127.16,"CC Extendido":1017.28,"PV ofrecido":170,"PV Extendido":1360,"Margen %":0.252,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-10-14","Antigüedad":3,"Mes":"octubre","Trimestre":"Q4"},{"Fecha creacion":"2025-10-11","Empresa que cotiza":"AT RD","Case #":"Case-2573","Oportunidad":"Inversiones Coconut","Categoria":"Silla","Incoterm":"DDP","Item":"65030_4013","Descripcion":"AFRICA COUNTER STOOL NAVY","Cantidad":8,"Costo compra":135.7,"CC Extendido":1085.6,"PV ofrecido":480,"PV Extendido":3840,"Margen %":0.236,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-10-14","Antigüedad":3,"Mes":"octubre","Trimestre":"Q4"},{"Fecha creacion":"2025-10-11","Empresa que cotiza":"AT RD","Case #":"Case-2573","Oportunidad":"Inversiones Coconut","Categoria":"Silla","Incoterm":"","Item":"Art Bar Stool","Descripcion":"Art Bar Stool H: 115 x W: 51 x D: 51 x SH: 83cm","Cantidad":8,"Costo compra":813.62,"CC Extendido":6508.96,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-10-14","Antigüedad":3,"Mes":"octubre","Trimestre":"Q4"},{"Fecha creacion":"2025-10-18","Empresa que cotiza":"AT RD","Case #":"Case-2584","Oportunidad":"EGEL LEGAL, SRL","Categoria":"Local","Incoterm":"DDP","Item":"FCM25","Descripcion":"Cafetera electrica Frigidaire 30 Tazas","Cantidad":1,"Costo compra":51.58,"CC Extendido":51.58,"PV ofrecido":70,"PV Extendido":70,"Margen %":0.263,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-11-04","Antigüedad":17,"Mes":"octubre","Trimestre":"Q4"},{"Fecha creacion":"2025-10-24","Empresa que cotiza":"AT RD","Case #":"Case-2587","Oportunidad":"COBBO BAY DEVELOPERS SA","Categoria":"Local","Incoterm":"DDP","Item":"65UR760H9UD","Descripcion":"4K UHD Hospitality TV 65\"","Cantidad":10,"Costo compra":1076,"CC Extendido":10760,"PV ofrecido":1310,"PV Extendido":13100,"Margen %":0.179,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-11-16","Antigüedad":23,"Mes":"octubre","Trimestre":"Q4"},{"Fecha creacion":"2025-10-24","Empresa que cotiza":"AT RD","Case #":"Case-2587","Oportunidad":"COBBO BAY DEVELOPERS SA","Categoria":"Local","Incoterm":"DDP","Item":"55UR760H9UA","Descripcion":"4K UHD Hospitality TV 55\"","Cantidad":20,"Costo compra":841.77,"CC Extendido":16835.4,"PV ofrecido":1026,"PV Extendido":20520,"Margen %":0.18,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-11-16","Antigüedad":23,"Mes":"octubre","Trimestre":"Q4"},{"Fecha creacion":"2025-10-31","Empresa que cotiza":"A. Int","Case #":"Case-2593","Oportunidad":"HARMONY & CO SRL","Categoria":"Extractor","Incoterm":"CIF","Item":"TMX 76 INOX","Descripcion":"Extractor Campana decorativa Teka","Cantidad":32,"Costo compra":62.1,"CC Extendido":1987.2,"PV ofrecido":156,"PV Extendido":4992,"Margen %":0.023,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-11-10","Antigüedad":10,"Mes":"octubre","Trimestre":"Q4"},{"Fecha creacion":"2025-10-31","Empresa que cotiza":"A. Int","Case #":"Case-2593","Oportunidad":"HARMONY & CO SRL","Categoria":"Lavadora","Incoterm":"CIF","Item":"7MWFC6820LC","Descripcion":"Lavasecadora whirlpool","Cantidad":32,"Costo compra":783,"CC Extendido":25056,"PV ofrecido":1130,"PV Extendido":36160,"Margen %":0.114,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-11-10","Antigüedad":10,"Mes":"octubre","Trimestre":"Q4"},{"Fecha creacion":"2025-10-31","Empresa que cotiza":"A. Int","Case #":"Case-2593","Oportunidad":"HARMONY & CO SRL","Categoria":"Nevera","Incoterm":"CIF","Item":"WD5600S","Descripcion":"Refrigerador Side By Side Whirlpool","Cantidad":32,"Costo compra":597,"CC Extendido":19104,"PV ofrecido":840,"PV Extendido":26880,"Margen %":0.073,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-11-10","Antigüedad":10,"Mes":"octubre","Trimestre":"Q4"},{"Fecha creacion":"2025-10-31","Empresa que cotiza":"A. Int","Case #":"Case-2593","Oportunidad":"HARMONY & CO SRL","Categoria":"Lavaplatos","Incoterm":"CIF","Item":"WDF341PAPM","Descripcion":"Lavaplatos Whirlpool 24\"","Cantidad":32,"Costo compra":259,"CC Extendido":8288,"PV ofrecido":370,"PV Extendido":11840,"Margen %":0.085,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-11-10","Antigüedad":10,"Mes":"octubre","Trimestre":"Q4"},{"Fecha creacion":"2025-10-31","Empresa que cotiza":"A. Int","Case #":"Case-2593","Oportunidad":"HARMONY & CO SRL","Categoria":"Estufa","Incoterm":"CIF","Item":"WCE55US0HB","Descripcion":"30-inch Electric Ceramic Glass Cooktop","Cantidad":32,"Costo compra":304,"CC Extendido":9728,"PV ofrecido":420,"PV Extendido":13440,"Margen %":0.075,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-11-10","Antigüedad":10,"Mes":"octubre","Trimestre":"Q4"},{"Fecha creacion":"2025-10-31","Empresa que cotiza":"A. Int","Case #":"Case-2593","Oportunidad":"HARMONY & CO SRL","Categoria":"TV","Incoterm":"CIF","Item":"UN55U8000FPXPA","Descripcion":"Televisor LED 55\" Samsung smart 4K","Cantidad":32,"Costo compra":353,"CC Extendido":11296,"PV ofrecido":497,"PV Extendido":15904,"Margen %":0.005,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-11-10","Antigüedad":10,"Mes":"octubre","Trimestre":"Q4"},{"Fecha creacion":"2025-11-07","Empresa que cotiza":"AT RD","Case #":"Case-2595","Oportunidad":"Square Santiago SAS","Categoria":"Local","Incoterm":"DDP","Item":"QN85Q7F5APXPA","Descripcion":"85\" QLED 4K Q7F5A Samsung Vision AI Smart TV","Cantidad":2,"Costo compra":1439,"CC Extendido":2878,"PV ofrecido":1920,"PV Extendido":3840,"Margen %":0.251,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-11-20","Antigüedad":13,"Mes":"noviembre","Trimestre":"Q4"},{"Fecha creacion":"2025-11-13","Empresa que cotiza":"A. Int","Case #":"Case-2596","Oportunidad":"Bonita Golf Residences","Categoria":"Extractor","Incoterm":"CIF","Item":"GFH 55","Descripcion":"Extractor teka empotrado debajo de Mueble","Cantidad":159,"Costo compra":99.5,"CC Extendido":15820.5,"PV ofrecido":150,"PV Extendido":23850,"Margen %":0.117,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-11-21","Antigüedad":8,"Mes":"noviembre","Trimestre":"Q4"},{"Fecha creacion":"2025-11-13","Empresa que cotiza":"A. Int","Case #":"Case-2596","Oportunidad":"Bonita Golf Residences","Categoria":"Horno Electrico","Incoterm":"CIF","Item":"HSB 646 S AIRFRY","Descripcion":"Horno Teka Electrico Multifuncion 6 Modos","Cantidad":159,"Costo compra":374.5,"CC Extendido":59545.5,"PV ofrecido":520,"PV Extendido":82680,"Margen %":0.07,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-11-21","Antigüedad":8,"Mes":"noviembre","Trimestre":"Q4"},{"Fecha creacion":"2025-11-13","Empresa que cotiza":"A. Int","Case #":"Case-2596","Oportunidad":"Bonita Golf Residences","Categoria":"Estufa","Incoterm":"CIF","Item":"TT6420","Descripcion":"Parilla Vitreceramica Teka 60 cms 4 quemadores","Cantidad":159,"Costo compra":199.5,"CC Extendido":31720.5,"PV ofrecido":275,"PV Extendido":43725,"Margen %":0.063,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-11-21","Antigüedad":8,"Mes":"noviembre","Trimestre":"Q4"},{"Fecha creacion":"2025-11-20","Empresa que cotiza":"A. Int","Case #":"Case-2597","Oportunidad":"Bonita Golf Residences","Categoria":"Extractor","Incoterm":"CIF","Item":"WHT6030S","Descripcion":"Campana de Empotre Telescopica Whirlpool 60 cms","Cantidad":159,"Costo compra":84,"CC Extendido":13356,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Cotizacion solicitada a proveedor","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"noviembre","Trimestre":"Q4"},{"Fecha creacion":"2025-11-20","Empresa que cotiza":"A. Int","Case #":"Case-2597","Oportunidad":"Bonita Golf Residences","Categoria":"Horno Electrico","Incoterm":"CIF","Item":"WOA105F","Descripcion":"Horno Electrico Whirlpool 24 pulgadas Negro","Cantidad":159,"Costo compra":184,"CC Extendido":29256,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Cotizacion solicitada a proveedor","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"noviembre","Trimestre":"Q4"},{"Fecha creacion":"2025-11-20","Empresa que cotiza":"A. Int","Case #":"Case-2597","Oportunidad":"Bonita Golf Residences","Categoria":"Estufa","Incoterm":"CIF","Item":"WEC5240B","Descripcion":"Estufa Whirlpool Vitroceramica Touch Electrica","Cantidad":159,"Costo compra":171,"CC Extendido":27189,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Cotizacion solicitada a proveedor","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"noviembre","Trimestre":"Q4"},{"Fecha creacion":"2025-11-27","Empresa que cotiza":"A. Int","Case #":"Case-2598","Oportunidad":"Bonita Golf Residences","Categoria":"Calentador de Agua en linea Cata","Incoterm":"CIF","Item":"CTRS-80 E-SMART REV SLIM","Descripcion":"Calentador Cata inteligente 80 litros","Cantidad":20,"Costo compra":203.15,"CC Extendido":4063,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Costeado","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"noviembre","Trimestre":"Q4"},{"Fecha creacion":"2025-11-27","Empresa que cotiza":"A. Int","Case #":"Case-2598","Oportunidad":"Bonita Golf Residences","Categoria":"Calentador de Agua en linea Cata","Incoterm":"CIF","Item":"CTRS-100 E-SMART REV SLIM","Descripcion":"Calentador Cata inteligente 100 litros","Cantidad":140,"Costo compra":228.06,"CC Extendido":31928.4,"PV ofrecido":345,"PV Extendido":48300,"Margen %":0.036,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-12-14","Antigüedad":17,"Mes":"noviembre","Trimestre":"Q4"},{"Fecha creacion":"2025-12-03","Empresa que cotiza":"A. Int","Case #":"Case-2600","Oportunidad":"Coral Green by ENEA","Categoria":"Fregadero","Incoterm":"CIF","Item":"BOLONIA 76","Descripcion":"Bolonia 76 Fregadero de 1 cuba","Cantidad":66,"Costo compra":193.2,"CC Extendido":12751.2,"PV ofrecido":345,"PV Extendido":22770,"Margen %":0.029,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-12-20","Antigüedad":17,"Mes":"diciembre","Trimestre":"Q4"},{"Fecha creacion":"2025-12-03","Empresa que cotiza":"A. Int","Case #":"Case-2600","Oportunidad":"Coral Green by ENEA","Categoria":"Abanico","Incoterm":"CIF","Item":"F803DL-CL","Descripcion":"Minka Aire Artemis 58\" 3 aspas Negro","Cantidad":148,"Costo compra":335.95,"CC Extendido":49720.6,"PV ofrecido":479,"PV Extendido":70892,"Margen %":0.068,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-12-20","Antigüedad":17,"Mes":"diciembre","Trimestre":"Q4"},{"Fecha creacion":"2025-12-03","Empresa que cotiza":"A. Int","Case #":"Case-2600","Oportunidad":"Coral Green by ENEA","Categoria":"TV","Incoterm":"CIF","Item":"UN55U8000FPXPA","Descripcion":"Televisor Samsung 55\" Crystal UHD 4k","Cantidad":82,"Costo compra":345,"CC Extendido":28290,"PV ofrecido":587,"PV Extendido":48134,"Margen %":0.026,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-12-20","Antigüedad":17,"Mes":"diciembre","Trimestre":"Q4"},{"Fecha creacion":"2025-12-03","Empresa que cotiza":"A. Int","Case #":"Case-2600","Oportunidad":"Coral Green by ENEA","Categoria":"TV","Incoterm":"CIF","Item":"UN65U8000FPXPA","Descripcion":"Televisor Samsung 65\" Crystal UHD 4k","Cantidad":66,"Costo compra":456,"CC Extendido":30096,"PV ofrecido":648,"PV Extendido":42768,"Margen %":0.007,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-12-20","Antigüedad":17,"Mes":"diciembre","Trimestre":"Q4"},{"Fecha creacion":"2025-12-03","Empresa que cotiza":"A. Int","Case #":"Case-2600","Oportunidad":"Coral Green by ENEA","Categoria":"Lavasecadora","Incoterm":"CIF","Item":"FLCG7522AW","Descripcion":"Torre de Lavado Frigidaire a Gas Blanca","Cantidad":66,"Costo compra":767,"CC Extendido":50622,"PV ofrecido":1096,"PV Extendido":72336,"Margen %":0.067,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-12-20","Antigüedad":17,"Mes":"diciembre","Trimestre":"Q4"},{"Fecha creacion":"2025-12-03","Empresa que cotiza":"A. Int","Case #":"Case-2600","Oportunidad":"Coral Green by ENEA","Categoria":"Estufa","Incoterm":"CIF","Item":"WCE77US0HS","Descripcion":"Estufa Whirlpool Vitroceramica Negra 30\"","Cantidad":66,"Costo compra":345,"CC Extendido":22770,"PV ofrecido":678,"PV Extendido":44748,"Margen %":0.044,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-12-20","Antigüedad":17,"Mes":"diciembre","Trimestre":"Q4"},{"Fecha creacion":"2025-12-03","Empresa que cotiza":"A. Int","Case #":"Case-2600","Oportunidad":"Coral Green by ENEA","Categoria":"Horno","Incoterm":"CIF","Item":"WOES3030LS","Descripcion":"Horno Whirlpool 30\" Electrico","Cantidad":66,"Costo compra":758,"CC Extendido":50028,"PV ofrecido":1054,"PV Extendido":69564,"Margen %":0.077,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-12-20","Antigüedad":17,"Mes":"diciembre","Trimestre":"Q4"},{"Fecha creacion":"2025-12-03","Empresa que cotiza":"A. Int","Case #":"Case-2600","Oportunidad":"Coral Green by ENEA","Categoria":"Nevera","Incoterm":"CIF","Item":"WRF560SFHZ","Descripcion":"30-inch Wide French Door Refrigerator - 20 cu. ft.","Cantidad":66,"Costo compra":745,"CC Extendido":49170,"PV ofrecido":1003,"PV Extendido":66198,"Margen %":0.076,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-12-20","Antigüedad":17,"Mes":"diciembre","Trimestre":"Q4"},{"Fecha creacion":"2025-12-03","Empresa que cotiza":"A. Int","Case #":"Case-2600","Oportunidad":"Coral Green by ENEA","Categoria":"Extractor","Incoterm":"CIF","Item":"WVW53UC0LS","Descripcion":"Extractor de grasa whirlpool chimenea 30\"","Cantidad":66,"Costo compra":173,"CC Extendido":11418,"PV ofrecido":237,"PV Extendido":15642,"Margen %":0.075,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-12-20","Antigüedad":17,"Mes":"diciembre","Trimestre":"Q4"},{"Fecha creacion":"2025-12-03","Empresa que cotiza":"A. Int","Case #":"Case-2600","Oportunidad":"Coral Green by ENEA","Categoria":"Caja Seg","Incoterm":"CIF","Item":"SF1LRB","Descripcion":"Caja de Seguridad onity OS100","Cantidad":66,"Costo compra":88.41,"CC Extendido":5835.06,"PV ofrecido":128,"PV Extendido":8448,"Margen %":0.082,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-12-20","Antigüedad":17,"Mes":"diciembre","Trimestre":"Q4"},{"Fecha creacion":"2025-12-03","Empresa que cotiza":"A. Int","Case #":"Case-2600","Oportunidad":"Coral Green by ENEA","Categoria":"Cafetera","Incoterm":"CIF","Item":"DCC-5570NAS","Descripcion":"Cafetera Cuisinart 5 tazas carafe de acero","Cantidad":66,"Costo compra":47.27,"CC Extendido":3119.82,"PV ofrecido":74,"PV Extendido":4884,"Margen %":0.092,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-12-20","Antigüedad":17,"Mes":"diciembre","Trimestre":"Q4"},{"Fecha creacion":"2025-12-03","Empresa que cotiza":"A. Int","Case #":"Case-2600","Oportunidad":"Coral Green by ENEA","Categoria":"Air Fryer","Incoterm":"CIF","Item":"TOA-65","Descripcion":"Horno tostador Air Fryer pantalla digital","Cantidad":66,"Costo compra":193.2,"CC Extendido":12751.2,"PV ofrecido":270,"PV Extendido":17820,"Margen %":0.07,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-12-20","Antigüedad":17,"Mes":"diciembre","Trimestre":"Q4"},{"Fecha creacion":"2025-12-03","Empresa que cotiza":"A. Int","Case #":"Case-2600","Oportunidad":"Coral Green by ENEA","Categoria":"Microondas","Incoterm":"CIF","Item":"CMW-70","Descripcion":"Cuisinart 0.7 litros Microondas Negro y Acero","Cantidad":66,"Costo compra":119.53,"CC Extendido":7888.98,"PV ofrecido":180,"PV Extendido":11880,"Margen %":0.092,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-12-20","Antigüedad":17,"Mes":"diciembre","Trimestre":"Q4"},{"Fecha creacion":"2025-12-03","Empresa que cotiza":"A. Int","Case #":"Case-2600","Oportunidad":"Coral Green by ENEA","Categoria":"Calentador","Incoterm":"CIF","Item":"CLT17L","Descripcion":"Calentador Drija de Linea a Gas 17 Litros","Cantidad":66,"Costo compra":202.4,"CC Extendido":13358.4,"PV ofrecido":335,"PV Extendido":22110,"Margen %":0.024,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-12-20","Antigüedad":17,"Mes":"diciembre","Trimestre":"Q4"},{"Fecha creacion":"2025-12-10","Empresa que cotiza":"AT RD","Case #":"Case-2606","Oportunidad":"Chatwin Company, SRL","Categoria":"Local","Incoterm":"DDP","Item":"R760xs 3.5\"","Descripcion":"PowerEdge R760xs 3.5\" Chassis","Cantidad":3,"Costo compra":21985,"CC Extendido":65955,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Costeado","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"diciembre","Trimestre":"Q4"},{"Fecha creacion":"2025-12-17","Empresa que cotiza":"AT RD","Case #":"Case-2612","Oportunidad":"Gizeh Constructora","Categoria":"TV","Incoterm":"DDP","Item":"100QNED86AS.AWP","Descripcion":"LG 100QNED86AS 100\" HDR QNED Smart LED TV","Cantidad":2,"Costo compra":2590,"CC Extendido":5180,"PV ofrecido":4710,"PV Extendido":9420,"Margen %":0.25,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-12-27","Antigüedad":10,"Mes":"diciembre","Trimestre":"Q4"},{"Fecha creacion":"2025-12-17","Empresa que cotiza":"AT RD","Case #":"Case-2612","Oportunidad":"Gizeh Constructora","Categoria":"Local","Incoterm":"DDP","Item":"QN100QN80FPXPA","Descripcion":"100\" Neo QLED QN80F 4K Vision AI Smart TV","Cantidad":2,"Costo compra":4079,"CC Extendido":8158,"PV ofrecido":5440,"PV Extendido":10880,"Margen %":0.25,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2025-12-27","Antigüedad":10,"Mes":"diciembre","Trimestre":"Q4"},{"Fecha creacion":"2025-12-23","Empresa que cotiza":"AT RD","Case #":"Case-2614","Oportunidad":"Inversiones Ocre Rojo (Onyx)","Categoria":"TV","Incoterm":"DDP","Item":"HG55BU800NFXZA","Descripcion":"Televisor samsung 55 Pulgadas Hospitality","Cantidad":63,"Costo compra":407,"CC Extendido":25641,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Costeado","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"diciembre","Trimestre":"Q4"},{"Fecha creacion":"2025-12-30","Empresa que cotiza":"AT RD","Case #":"Case-2616","Oportunidad":"Riverhome Capital SAS","Categoria":"Cafetera","Incoterm":"DDP","Item":"49981RG","Descripcion":"Hamilton Beach The Scoop Single-Serve Coffee Maker","Cantidad":15,"Costo compra":57.11,"CC Extendido":856.65,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Costeado","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"diciembre","Trimestre":"Q4"},{"Fecha creacion":"2026-01-06","Empresa que cotiza":"AT RD","Case #":"Case-2617","Oportunidad":"Inversiones Ginark SAS","Categoria":"TV","Incoterm":"DDP","Item":"HG55AU800NFXZA","Descripcion":"Televisor samsung 55 Pulgadas Hospitality","Cantidad":10,"Costo compra":399,"CC Extendido":3990,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Costeado","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"enero","Trimestre":"Q1"},{"Fecha creacion":"2026-01-12","Empresa que cotiza":"AT RD","Case #":"Case-2634","Oportunidad":"Promociones e Inversiones Geranio SRL","Categoria":"Local","Incoterm":"DDP","Item":"WD25","Descripcion":"Dell Pro Dock WD25","Cantidad":5,"Costo compra":0,"CC Extendido":0,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Preparando RFQ","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"enero","Trimestre":"Q1"},{"Fecha creacion":"2026-01-12","Empresa que cotiza":"AT RD","Case #":"Case-2634","Oportunidad":"Promociones e Inversiones Geranio SRL","Categoria":"Local","Incoterm":"DDP","Item":"ST4000VX016","Descripcion":"Seagate Skyhawk Disco Duro Video Vigilancia 4TB","Cantidad":16,"Costo compra":126.51,"CC Extendido":2024.16,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Preparando RFQ","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"enero","Trimestre":"Q1"},{"Fecha creacion":"2026-01-12","Empresa que cotiza":"AT RD","Case #":"Case-2634","Oportunidad":"Promociones e Inversiones Geranio SRL","Categoria":"Local","Incoterm":"DDP","Item":"AB356NXT07","Descripcion":"ROLLO DE CABLE FOIL UTP NEXXT CAT6","Cantidad":4,"Costo compra":246.14,"CC Extendido":984.56,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Preparando RFQ","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"enero","Trimestre":"Q1"},{"Fecha creacion":"2026-01-12","Empresa que cotiza":"AT RD","Case #":"Case-2634","Oportunidad":"Promociones e Inversiones Geranio SRL","Categoria":"Local","Incoterm":"DDP","Item":"DS-2CD2125FWD-IS","Descripcion":"CAMARA DE VIGILANCIA DOMO Hikvision","Cantidad":40,"Costo compra":96.32,"CC Extendido":3852.8,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Preparando RFQ","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"enero","Trimestre":"Q1"},{"Fecha creacion":"2026-01-12","Empresa que cotiza":"AT RD","Case #":"Case-2634","Oportunidad":"Promociones e Inversiones Geranio SRL","Categoria":"Local","Incoterm":"DDP","Item":"DS-2CD2643G2-IZS","Descripcion":"CAMARA BULLET Hikvision","Cantidad":20,"Costo compra":166.98,"CC Extendido":3339.6,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Preparando RFQ","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"enero","Trimestre":"Q1"},{"Fecha creacion":"2026-01-12","Empresa que cotiza":"AT RD","Case #":"Case-2634","Oportunidad":"Promociones e Inversiones Geranio SRL","Categoria":"Local","Incoterm":"DDP","Item":"322PE","Descripcion":"MONITOR HP 322PE 22\" S3 PRO CLASS","Cantidad":20,"Costo compra":102.68,"CC Extendido":2053.6,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Preparando RFQ","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"enero","Trimestre":"Q1"},{"Fecha creacion":"2026-01-12","Empresa que cotiza":"AT RD","Case #":"Case-2634","Oportunidad":"Promociones e Inversiones Geranio SRL","Categoria":"Local","Incoterm":"DDP","Item":"1334U","Descripcion":"LAPTOP HP PROBOOK 4 G1 14\" FHD I5","Cantidad":8,"Costo compra":815.98,"CC Extendido":6527.84,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Preparando RFQ","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"enero","Trimestre":"Q1"},{"Fecha creacion":"2026-01-12","Empresa que cotiza":"AT RD","Case #":"Case-2634","Oportunidad":"Promociones e Inversiones Geranio SRL","Categoria":"Local","Incoterm":"DDP","Item":"KM5221W","Descripcion":"TECLADO Y MOUSE DELL KM5221W COMBO WIRELESS","Cantidad":5,"Costo compra":0,"CC Extendido":0,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2026-01-17","Antigüedad":5,"Mes":"enero","Trimestre":"Q1"},{"Fecha creacion":"2026-01-12","Empresa que cotiza":"AT RD","Case #":"Case-2634","Oportunidad":"Promociones e Inversiones Geranio SRL","Categoria":"Local","Incoterm":"DDP","Item":"IdeaHub B3","Descripcion":"Huawei IdeaHub B3 65-inch Bundle","Cantidad":1,"Costo compra":0,"CC Extendido":0,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2026-01-17","Antigüedad":5,"Mes":"enero","Trimestre":"Q1"},{"Fecha creacion":"2026-01-12","Empresa que cotiza":"AT RD","Case #":"Case-2634","Oportunidad":"Promociones e Inversiones Geranio SRL","Categoria":"Local","Incoterm":"DDP","Item":"BX850M-LM60","Descripcion":"UPS APC BX850M-LM60 BACK-UPS 0.85KVA 510W","Cantidad":12,"Costo compra":143.92,"CC Extendido":1727.04,"PV ofrecido":175,"PV Extendido":2100,"Margen %":0.178,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2026-01-17","Antigüedad":5,"Mes":"enero","Trimestre":"Q1"},{"Fecha creacion":"2026-01-12","Empresa que cotiza":"AT RD","Case #":"Case-2634","Oportunidad":"Promociones e Inversiones Geranio SRL","Categoria":"Local","Incoterm":"DDP","Item":"A70PKUT","Descripcion":"COMPUTADORA HP PRO SFF 400 G9","Cantidad":1,"Costo compra":1114.27,"CC Extendido":1114.27,"PV ofrecido":1358,"PV Extendido":1358,"Margen %":0.179,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2026-01-17","Antigüedad":5,"Mes":"enero","Trimestre":"Q1"},{"Fecha creacion":"2026-01-12","Empresa que cotiza":"AT RD","Case #":"Case-2634","Oportunidad":"Promociones e Inversiones Geranio SRL","Categoria":"Local","Incoterm":"DDP","Item":"Latitude 7212","Descripcion":"Dell Latitude 7212 Rugged Extreme Tablet","Cantidad":1,"Costo compra":0,"CC Extendido":0,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2026-01-17","Antigüedad":5,"Mes":"enero","Trimestre":"Q1"},{"Fecha creacion":"2026-01-12","Empresa que cotiza":"AT RD","Case #":"Case-2634","Oportunidad":"Promociones e Inversiones Geranio SRL","Categoria":"Local","Incoterm":"DDP","Item":"FDC-106K","Descripcion":"UPS FORZA ATLAS 6000 VA 6000 WATTS","Cantidad":1,"Costo compra":2071.11,"CC Extendido":2071.11,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Costeado","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"enero","Trimestre":"Q1"},{"Fecha creacion":"2026-01-19","Empresa que cotiza":"AT RD","Case #":"Case-2642","Oportunidad":"Occifitur Dominicana, SRL (Hotel Embajador)","Categoria":"TV","Incoterm":"DDP","Item":"UN55DU8000PXPA","Descripcion":"TV Samsung 55\" Crystal UHD 4K DU8000","Cantidad":2,"Costo compra":459.99,"CC Extendido":919.98,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Costeado","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"enero","Trimestre":"Q1"},{"Fecha creacion":"2026-01-19","Empresa que cotiza":"AT RD","Case #":"Case-2642","Oportunidad":"Occifitur Dominicana, SRL (Hotel Embajador)","Categoria":"TV","Incoterm":"DDP","Item":"UN50U8000FPXPA","Descripcion":"TV Samsung 50 Inch Crystal UHD U8000F","Cantidad":1,"Costo compra":413.99,"CC Extendido":413.99,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Costeado","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"enero","Trimestre":"Q1"},{"Fecha creacion":"2026-01-26","Empresa que cotiza":"AT RD","Case #":"Case-2644","Oportunidad":"Atlambar management S A","Categoria":"Local","Incoterm":"DDP","Item":"SRT0001","Descripcion":"PUERTOS USB/SNMP/RS-232 ONDA SINUSOIDAL","Cantidad":1,"Costo compra":930.23,"CC Extendido":930.23,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Costeado","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"enero","Trimestre":"Q1"},{"Fecha creacion":"2026-02-01","Empresa que cotiza":"AT RD","Case #":"Case-2645","Oportunidad":"Atlambar management S A","Categoria":"Local","Incoterm":"DDP","Item":"SRV0001","Descripcion":"PANTALLA LCD ESCALABLE 110/220V","Cantidad":15,"Costo compra":24.96,"CC Extendido":374.4,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Costeado","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"febrero","Trimestre":"Q1"},{"Fecha creacion":"2026-02-08","Empresa que cotiza":"AT RD","Case #":"Case-2648","Oportunidad":"Solaya Hotels & Resort SRL","Categoria":"Local","Incoterm":"DDP","Item":"62F7KAR4LA","Descripcion":"Lenovo Thinkvision E20-30","Cantidad":5,"Costo compra":80.71,"CC Extendido":403.55,"PV ofrecido":100,"PV Extendido":500,"Margen %":0.193,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2026-02-13","Antigüedad":5,"Mes":"febrero","Trimestre":"Q1"},{"Fecha creacion":"2026-02-08","Empresa que cotiza":"AT RD","Case #":"Case-2648","Oportunidad":"Solaya Hotels & Resort SRL","Categoria":"Local","Incoterm":"DDP","Item":"21SR007JFJ","Descripcion":"Lenovo Thinkpad E16 Gen 3 Intel Ultra 7","Cantidad":3,"Costo compra":1103.79,"CC Extendido":3311.37,"PV ofrecido":1380,"PV Extendido":4140,"Margen %":0.2,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2026-02-13","Antigüedad":5,"Mes":"febrero","Trimestre":"Q1"},{"Fecha creacion":"2026-02-08","Empresa que cotiza":"AT RD","Case #":"Case-2648","Oportunidad":"Solaya Hotels & Resort SRL","Categoria":"Local","Incoterm":"DDP","Item":"21SX0084FJ","Descripcion":"Lenovo Thinkpad E14 Gen 7 Intel Ultra 5","Cantidad":2,"Costo compra":931.16,"CC Extendido":1862.32,"PV ofrecido":1160,"PV Extendido":2320,"Margen %":0.197,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2026-02-13","Antigüedad":5,"Mes":"febrero","Trimestre":"Q1"},{"Fecha creacion":"2026-02-08","Empresa que cotiza":"AT RD","Case #":"Case-2648","Oportunidad":"Solaya Hotels & Resort SRL","Categoria":"Local","Incoterm":"DDP","Item":"13DH0002FJ","Descripcion":"Lenovo ThinkCentre Neo 30S Gen 5 I5","Cantidad":5,"Costo compra":640.97,"CC Extendido":3204.85,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Costeado","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"febrero","Trimestre":"Q1"},{"Fecha creacion":"2026-02-15","Empresa que cotiza":"AT RD","Case #":"Case-2649","Oportunidad":"Solaya Hotels & Resort SRL","Categoria":"TV","Incoterm":"DDP","Item":"HG55AU800NFXZA","Descripcion":"Televisor samsung 55 Pulgadas Hospitality","Cantidad":7,"Costo compra":399,"CC Extendido":2793,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Costeado","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"febrero","Trimestre":"Q1"},{"Fecha creacion":"2026-02-21","Empresa que cotiza":"AT RD","Case #":"Case-2651","Oportunidad":"Harmony & CO.","Categoria":"Espejo","Incoterm":"DDP","Item":"41741W","Descripcion":"Conair Wall-Mount Mirror Double Sided 5x","Cantidad":100,"Costo compra":0,"CC Extendido":0,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Cotizacion solicitada a proveedor","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"febrero","Trimestre":"Q1"},{"Fecha creacion":"2026-02-21","Empresa que cotiza":"AT RD","Case #":"Case-2651","Oportunidad":"Harmony & CO.","Categoria":"Cafetera","Incoterm":"DDP","Item":"DCC-5570NAS","Descripcion":"Cuisinart 5-Cup Coffee Maker","Cantidad":100,"Costo compra":47.27,"CC Extendido":4727,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Cotizacion solicitada a proveedor","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"febrero","Trimestre":"Q1"},{"Fecha creacion":"2026-02-21","Empresa que cotiza":"AT RD","Case #":"Case-2651","Oportunidad":"Harmony & CO.","Categoria":"Secador de pelo","Incoterm":"DDP","Item":"134BW","Descripcion":"Conair 1600 Watt Wall-Mount Dryer Black","Cantidad":100,"Costo compra":26.68,"CC Extendido":2668,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Cotizacion solicitada a proveedor","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"febrero","Trimestre":"Q1"},{"Fecha creacion":"2026-02-28","Empresa que cotiza":"AT RD","Case #":"Case-2652","Oportunidad":"Promotora Benihana | Hotel Costa Caribe","Categoria":"Cama","Incoterm":"DDP","Item":"BMS22TP","Descripcion":"Twin SICO Mobile Sleeper - Port Frame/Vinyl","Cantidad":10,"Costo compra":1013.65,"CC Extendido":10136.5,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Cotizacion solicitada a proveedor","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"febrero","Trimestre":"Q1"},{"Fecha creacion":"2026-03-07","Empresa que cotiza":"AT RD","Case #":"Case-2653","Oportunidad":"KAT Arena Go minestries","Categoria":"Aire Acondicionado","Incoterm":"CIF","Item":"FXAQ63AVM","Descripcion":"WALL MOUNTED INDOOR UNIT","Cantidad":4,"Costo compra":647.63,"CC Extendido":2590.52,"PV ofrecido":1030,"PV Extendido":4120,"Margen %":0.089,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2026-03-19","Antigüedad":12,"Mes":"marzo","Trimestre":"Q1"},{"Fecha creacion":"2026-03-07","Empresa que cotiza":"AT RD","Case #":"Case-2653","Oportunidad":"KAT Arena Go minestries","Categoria":"Aire Acondicionado","Incoterm":"CIF","Item":"RXQ20TATL","Descripcion":"VRV-IV INVERTER R410A 220V OUTDOOR UNIT","Cantidad":1,"Costo compra":5812.73,"CC Extendido":5812.73,"PV ofrecido":9810,"PV Extendido":9810,"Margen %":0.098,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2026-03-19","Antigüedad":12,"Mes":"marzo","Trimestre":"Q1"},{"Fecha creacion":"2026-03-07","Empresa que cotiza":"AT RD","Case #":"Case-2653","Oportunidad":"KAT Arena Go minestries","Categoria":"Aire Acondicionado","Incoterm":"CIF","Item":"RXQ8TATL","Descripcion":"VRV-IV INVERTER R410A 220V OUTDOOR UNIT","Cantidad":1,"Costo compra":3334.1,"CC Extendido":3334.1,"PV ofrecido":7170,"PV Extendido":7170,"Margen %":0.118,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2026-03-19","Antigüedad":12,"Mes":"marzo","Trimestre":"Q1"},{"Fecha creacion":"2026-03-07","Empresa que cotiza":"AT RD","Case #":"Case-2653","Oportunidad":"KAT Arena Go minestries","Categoria":"Aire Acondicionado","Incoterm":"CIF","Item":"FXAQ50AVM","Descripcion":"WALL MOUNTED INDOOR UNIT","Cantidad":2,"Costo compra":608.26,"CC Extendido":1216.52,"PV ofrecido":970,"PV Extendido":1940,"Margen %":0.098,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2026-03-19","Antigüedad":12,"Mes":"marzo","Trimestre":"Q1"},{"Fecha creacion":"2026-03-07","Empresa que cotiza":"AT RD","Case #":"Case-2653","Oportunidad":"KAT Arena Go minestries","Categoria":"Partes Aires Acondicionado","Incoterm":"CIF","Item":"KHRP26A72T7","Descripcion":"REFNET JOINT","Cantidad":4,"Costo compra":101.02,"CC Extendido":404.08,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Preparando RFQ","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"marzo","Trimestre":"Q1"},{"Fecha creacion":"2026-03-07","Empresa que cotiza":"AT RD","Case #":"Case-2653","Oportunidad":"KAT Arena Go minestries","Categoria":"Partes Aires Acondicionado","Incoterm":"CIF","Item":"BRC1E63","Descripcion":"VRV NAVIGATION REMOTE CONTROLLER","Cantidad":3,"Costo compra":90.68,"CC Extendido":272.04,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Preparando RFQ","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"marzo","Trimestre":"Q1"},{"Fecha creacion":"2026-03-07","Empresa que cotiza":"AT RD","Case #":"Case-2653","Oportunidad":"KAT Arena Go minestries","Categoria":"Partes Aires Acondicionado","Incoterm":"CIF","Item":"BRC7M676","Descripcion":"WIRELESS REMOTE CONTROLLER for FXAQ AVM","Cantidad":6,"Costo compra":104.74,"CC Extendido":628.44,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Preparando RFQ","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"marzo","Trimestre":"Q1"},{"Fecha creacion":"2026-03-07","Empresa que cotiza":"AT RD","Case #":"Case-2653","Oportunidad":"KAT Arena Go minestries","Categoria":"Partes Aires Acondicionado","Incoterm":"CIF","Item":"FXMQ200PVM","Descripcion":"VRV DUCT CEILING MOUNTED INDOOR UNIT","Cantidad":1,"Costo compra":1876.15,"CC Extendido":1876.15,"PV ofrecido":3760,"PV Extendido":3760,"Margen %":0.068,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2026-03-19","Antigüedad":12,"Mes":"marzo","Trimestre":"Q1"},{"Fecha creacion":"2026-03-07","Empresa que cotiza":"AT RD","Case #":"Case-2653","Oportunidad":"KAT Arena Go minestries","Categoria":"Partes Aires Acondicionado","Incoterm":"CIF","Item":"FXMQ63PAVE","Descripcion":"DUCT CEILING-MOUNTED INDOOR UNIT","Cantidad":2,"Costo compra":819.65,"CC Extendido":1639.3,"PV ofrecido":1490,"PV Extendido":2980,"Margen %":0.06,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2026-03-19","Antigüedad":12,"Mes":"marzo","Trimestre":"Q1"},{"Fecha creacion":"2026-03-07","Empresa que cotiza":"AT RD","Case #":"Case-2653","Oportunidad":"KAT Arena Go minestries","Categoria":"Partes Aires Acondicionado","Incoterm":"CIF","Item":"KHRP26A22T7","Descripcion":"2 PIPE REFNET JOINT","Cantidad":1,"Costo compra":44.9,"CC Extendido":44.9,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Preparando RFQ","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"marzo","Trimestre":"Q1"},{"Fecha creacion":"2026-03-07","Empresa que cotiza":"AT RD","Case #":"Case-2653","Oportunidad":"KAT Arena Go minestries","Categoria":"Partes Aires Acondicionado","Incoterm":"CIF","Item":"KHRP26A33T7","Descripcion":"2 PIPE REFNET JOINT","Cantidad":2,"Costo compra":50.51,"CC Extendido":101.02,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Preparando RFQ","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"marzo","Trimestre":"Q1"},{"Fecha creacion":"2026-03-14","Empresa que cotiza":"","Case #":"Case-2658","Oportunidad":"COSTA DORADA BEACH RESORT SAS","Categoria":"Local","Incoterm":"DDP","Item":"CB15","Descripcion":"LICUADORA UN GALON Waring Model No. CB15","Cantidad":1,"Costo compra":1998,"CC Extendido":1998,"PV ofrecido":2440,"PV Extendido":2440,"Margen %":0.181,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2026-04-10","Antigüedad":27,"Mes":"marzo","Trimestre":"Q1"},{"Fecha creacion":"2026-03-14","Empresa que cotiza":"","Case #":"Case-2658","Oportunidad":"COSTA DORADA BEACH RESORT SAS","Categoria":"Local","Incoterm":"DDP","Item":"TM-767A","Descripcion":"LICUADORA 64 ONZ. VASO TRITAN Omniblend","Cantidad":1,"Costo compra":330,"CC Extendido":330,"PV ofrecido":400,"PV Extendido":400,"Margen %":0.175,"Status de linea":"Cotizado","Fecha Cotizacion a cliente":"2026-04-10","Antigüedad":27,"Mes":"marzo","Trimestre":"Q1"},{"Fecha creacion":"2026-03-21","Empresa que cotiza":"AT RD","Case #":"Case-2661","Oportunidad":"Solaya Hotels & Resort SRL","Categoria":"Telefonos","Incoterm":"DDP","Item":"NG-S3411","Descripcion":"Vtech 1-Line SIP Cordless Phone S3411","Cantidad":85,"Costo compra":92.4,"CC Extendido":7854,"PV ofrecido":0,"PV Extendido":0,"Margen %":0,"Status de linea":"Cotizacion solicitada a proveedor","Fecha Cotizacion a cliente":"","Antigüedad":0,"Mes":"marzo","Trimestre":"Q1"}];
+
+let DATA = [...INITIAL_DATA];
+let charts = {};
+
+// ======================== HELPERS ========================
+const fmt$ = n => n >= 1e6 ? '$'+(n/1e6).toFixed(2)+'M' : n >= 1e3 ? '$'+Math.round(n/1e3)+'K' : '$'+Math.round(n);
+const fmtPct = n => (n*100).toFixed(1)+'%';
+const unique = (arr,k) => [...new Set(arr.map(r=>r[k]).filter(Boolean))].sort();
+const sum = (arr,k) => arr.reduce((a,r)=>a+(parseFloat(r[k])||0),0);
+const count = (arr,k,v) => arr.filter(r=>r[k]===v).length;
+const distinctCount = (arr,k) => new Set(arr.map(r=>r[k]).filter(Boolean)).size;
+
+const STATUS_META = {
+  'Cotizado':{color:'#22C55E',order:1},
+  'Costeado':{color:'#3B82F6',order:2},
+  'Preparando RFQ':{color:'#F59E0B',order:3},
+  'Cotizacion solicitada a proveedor':{color:'#EF4444',order:4}
+};
+
+// ======================== FILTERS ========================
+function buildFilters(){
+  const c = document.getElementById('filters');
+  c.innerHTML = '';
+  const fields = [
+    {key:'Empresa que cotiza', label:'Company'},
+    {key:'Status de linea', label:'Status'},
+    {key:'Categoria', label:'Category'},
+    {key:'Trimestre', label:'Quarter'}
+  ];
+  fields.forEach(f => {
+    const sel = document.createElement('select');
+    sel.className = 'filter-select';
+    sel.dataset.key = f.key;
+    sel.innerHTML = `<option value="">All — ${f.label}</option>` +
+      unique(DATA,f.key).map(v=>`<option value="${v}">${v}</option>`).join('');
+    sel.addEventListener('change', render);
+    c.appendChild(sel);
+  });
+}
+
+function getFiltered(){
+  let d = [...DATA];
+  document.querySelectorAll('.filter-select').forEach(sel => {
+    if(sel.value) d = d.filter(r => r[sel.dataset.key] === sel.value);
+  });
+  return d;
+}
+
+// ======================== RENDER ========================
+function render(){
+  const d = getFiltered();
+  renderKPIs(d);
+  renderPipeline(d);
+  renderChartPV(d);
+  renderChartTrend(d);
+  renderChartCat(d);
+  renderTable(d);
+}
+
+function renderKPIs(d){
+  const totalPV = sum(d,'PV Extendido');
+  const totalCC = sum(d,'CC Extendido');
+  const withPV = d.filter(r=>(parseFloat(r['PV Extendido'])||0)>0);
+  const pvReal = sum(withPV,'PV Extendido');
+  const ccReal = sum(withPV,'CC Extendido');
+  const margenReal = pvReal > 0 ? (pvReal-ccReal)/pvReal : 0;
+  const avgAge = d.length ? (d.reduce((a,r)=>a+(parseFloat(r['Antigüedad'])||0),0)/d.length) : 0;
+
+  document.getElementById('kpis').innerHTML = `
+    <div class="kpi"><div class="kpi-label">Total Cases</div><div class="kpi-value">${distinctCount(d,'Case #')}</div><div class="kpi-sub">${distinctCount(d,'Oportunidad')} opportunities · ${d.length} lines</div></div>
+    <div class="kpi"><div class="kpi-label">Total PV</div><div class="kpi-value">${fmt$(totalPV)}</div><div class="kpi-sub">Cost: ${fmt$(totalCC)}</div></div>
+    <div class="kpi"><div class="kpi-label">Real Margin %</div><div class="kpi-value" style="color:${margenReal>=0?'var(--green)':'var(--red)'}">${fmtPct(margenReal)}</div><div class="kpi-sub">${d.length - withPV.length} lines without PV</div></div>
+    <div class="kpi"><div class="kpi-label">Avg Age</div><div class="kpi-value">${Math.round(avgAge)} days</div><div class="kpi-sub">${d.length} records</div></div>
+    <div class="kpi"><div class="kpi-label">Pipeline Progress</div><div class="kpi-value">${fmtPct(count(d,'Status de linea','Cotizado')/Math.max(d.length,1))}</div><div class="kpi-sub">${count(d,'Status de linea','Cotizado')} quoted of ${d.length}</div></div>
+  `;
+}
+
+function renderPipeline(d){
+  const statuses = Object.keys(STATUS_META).sort((a,b)=>STATUS_META[a].order - STATUS_META[b].order);
+  const max = Math.max(...statuses.map(s=>count(d,'Status de linea',s)),1);
+  document.getElementById('pipeline').innerHTML = statuses.map(s => {
+    const c = count(d,'Status de linea',s);
+    const pct = Math.max((c/max)*100,2);
+    return `<div class="pipe-item">
+      <div class="pipe-label">${s === 'Cotizacion solicitada a proveedor' ? 'Quote requested' : s}</div>
+      <div class="pipe-track"><div class="pipe-fill" style="width:${pct}%;background:${STATUS_META[s].color}">${c}</div></div>
+    </div>`;
+  }).join('');
+}
+
+function renderChartPV(d){
+  const groups = {};
+  d.forEach(r => { const e = r['Empresa que cotiza'] || 'Unassigned'; groups[e] = (groups[e]||0) + (parseFloat(r['PV Extendido'])||0); });
+  const sorted = Object.entries(groups).sort((a,b)=>b[1]-a[1]);
+  const labels = sorted.map(e=>e[0]);
+  const values = sorted.map(e=>e[1]);
+  const colors = labels.map(l => l==='A. Int'?'#3B82F6':l==='AT RD'?'#22C55E':'#64748B');
+
+  if(charts.pv) charts.pv.destroy();
+  charts.pv = new Chart(document.getElementById('chartPV'),{
+    type:'bar',
+    data:{labels, datasets:[{data:values, backgroundColor:colors, borderRadius:4, barThickness:28}]},
+    options:{indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label:ctx=>'$'+ctx.raw.toLocaleString()}}},
+      scales:{x:{grid:{color:'rgba(255,255,255,.05)'}, ticks:{color:'#64748B',callback:v=>fmt$(v)}}, y:{grid:{display:false}, ticks:{color:'#94A3B8',font:{size:12}}}}}
+  });
+}
+
+function renderChartTrend(d){
+  const months = {};
+  d.forEach(r => {
+    const date = r['Fecha creacion'];
+    if(!date) return;
+    const key = date.substring(0,7);
+    months[key] = (months[key]||0) + (parseFloat(r['PV Extendido'])||0);
+  });
+  const sorted = Object.entries(months).sort((a,b)=>a[0].localeCompare(b[0]));
+  const labels = sorted.map(e => {const [y,m]=e[0].split('-'); return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m)-1]+' '+y.slice(2);});
+  const values = sorted.map(e=>e[1]);
+
+  if(charts.trend) charts.trend.destroy();
+  charts.trend = new Chart(document.getElementById('chartTrend'),{
+    type:'line',
+    data:{labels, datasets:[{data:values, borderColor:'#3B82F6', backgroundColor:'rgba(59,130,246,.08)', fill:true, tension:.35, pointRadius:4, pointBackgroundColor:'#3B82F6', borderWidth:2.5}]},
+    options:{responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{x:{grid:{display:false}, ticks:{color:'#64748B'}}, y:{grid:{color:'rgba(255,255,255,.05)'}, ticks:{color:'#64748B', callback:v=>fmt$(v)}}}}
+  });
+}
+
+function renderChartCat(d){
+  const groups = {};
+  d.forEach(r => { const c = r['Categoria']||'Other'; groups[c] = (groups[c]||0)+(parseFloat(r['PV Extendido'])||0); });
+  const sorted = Object.entries(groups).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const palette = ['#3B82F6','#22C55E','#A78BFA','#F59E0B','#EF4444','#EC4899','#06B6D4','#64748B'];
+
+  if(charts.cat) charts.cat.destroy();
+  charts.cat = new Chart(document.getElementById('chartCat'),{
+    type:'doughnut',
+    data:{labels:sorted.map(e=>e[0]), datasets:[{data:sorted.map(e=>e[1]), backgroundColor:palette.slice(0,sorted.length), borderWidth:0, spacing:3}]},
+    options:{responsive:true, maintainAspectRatio:false, cutout:'62%',
+      plugins:{legend:{position:'right', labels:{usePointStyle:true, pointStyle:'rectRounded', boxWidth:10, padding:10, font:{size:11, family:'DM Sans'}, color:'#94A3B8'}}}}
+  });
+}
+
+function renderTable(d){
+  const cols = ['Case #','Oportunidad','Empresa que cotiza','Categoria','Item','Cantidad','PV Extendido','CC Extendido','Status de linea'];
+  document.getElementById('thead').innerHTML = '<tr>'+cols.map(c=>`<th>${c}</th>`).join('')+'</tr>';
+  document.getElementById('tbody').innerHTML = d.slice(0,50).map(r => {
+    const statusClass = r['Status de linea']==='Cotizado'?'status-cotizado':
+      r['Status de linea']==='Costeado'?'status-costeado':
+      r['Status de linea']==='Preparando RFQ'?'status-rfq':'status-solicitada';
+    return '<tr>'+cols.map(c => {
+      if(c==='Status de linea') return `<td><span class="status-tag ${statusClass}">${r[c]}</span></td>`;
+      if(c==='PV Extendido'||c==='CC Extendido') return `<td>$${(parseFloat(r[c])||0).toLocaleString()}</td>`;
+      return `<td>${r[c]||'—'}</td>`;
+    }).join('')+'</tr>';
+  }).join('');
+}
+
+// ======================== CSV UPLOAD ========================
+document.getElementById('csvInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  Papa.parse(file, {
+    header: true,
+    skipEmptyLines: true,
+    complete: function(results){
+      if(results.data && results.data.length > 0){
+        // Normalize field names
+        DATA = results.data.map(r => {
+          const row = {};
+          Object.keys(r).forEach(k => {
+            const clean = k.trim();
+            row[clean] = r[k];
+          });
+          // Normalize company name
+          if(row['Empresa que cotiza'] === 'A Int.') row['Empresa que cotiza'] = 'A. Int';
+          // Ensure numeric fields
+          ['Cantidad','Costo compra','CC Extendido','PV ofrecido','PV Extendido','Margen %','Antigüedad'].forEach(f => {
+            if(row[f] !== undefined) row[f] = parseFloat(row[f]) || 0;
+          });
+          return row;
+        });
+        document.getElementById('lastUpdate').textContent = DATA.length + ' records';
+        buildFilters();
+        render();
+        showToast(`Updated: ${DATA.length} records loaded`);
+      }
+    }
+  });
+  e.target.value = '';
+});
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3000);
+}
+
+// ======================== INIT ========================
+buildFilters();
+render();
+</script>
+</body>
+</html>
