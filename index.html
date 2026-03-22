@@ -412,6 +412,141 @@ function renderTable(d){
   }).join('');
 }
 
+// ======================== SUPABASE CONFIG ========================
+// >> PASTE YOUR CREDENTIALS HERE <<
+const SUPABASE_URL = 'https://rymvpghdcudshzxwppsm.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ5bXZwZ2hkY3Vkc2h6eHdwcHNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNjQzMDEsImV4cCI6MjA4OTc0MDMwMX0.A2I_qGhz9-LVonyrAwC39nY-y-mwsCI-yGHjnzCXAy0';
+
+const supabaseHeaders = {
+  'apikey': SUPABASE_KEY,
+  'Authorization': 'Bearer ' + SUPABASE_KEY,
+  'Content-Type': 'application/json',
+  'Prefer': 'return=minimal'
+};
+
+// Column mapping: CSV header → Supabase column
+const COL_MAP = {
+  'Case #':'case_number','Item':'item','Fecha creacion':'fecha_creacion',
+  'Empresa que cotiza':'empresa','Project Manager':'project_manager',
+  'Oportunidad':'oportunidad','Categoria':'categoria','Incoterm':'incoterm',
+  'Descripcion':'descripcion','Cantidad':'cantidad','Costo compra':'costo_compra',
+  'CC Extendido':'cc_extendido','PV ofrecido':'pv_ofrecido','PV Extendido':'pv_extendido',
+  'Margen %':'margen_pct','Status de linea':'status',
+  'Fecha Cotizacion a cliente':'fecha_cotizacion','Antigüedad':'antiguedad',
+  'Mes':'mes','Trimestre':'trimestre','Rango Margen':'rango_margen'
+};
+
+// Reverse map: Supabase column → display header
+const COL_REV = {};
+Object.entries(COL_MAP).forEach(([k,v]) => COL_REV[v] = k);
+
+function toSupabaseRow(csvRow){
+  const row = {};
+  Object.entries(COL_MAP).forEach(([csvCol, dbCol]) => {
+    let v = csvRow[csvCol];
+    if(v === undefined || v === null || v === '') { row[dbCol] = null; return; }
+    if(['cantidad','antiguedad'].includes(dbCol)) row[dbCol] = parseInt(v) || 0;
+    else if(['costo_compra','cc_extendido','pv_ofrecido','pv_extendido','margen_pct'].includes(dbCol)) row[dbCol] = parseFloat(v) || 0;
+    else row[dbCol] = String(v).trim();
+  });
+  // Normalize company
+  if(row.empresa === 'A Int.') row.empresa = 'A. Int';
+  return row;
+}
+
+function toDisplayRow(dbRow){
+  const row = {};
+  Object.entries(COL_REV).forEach(([dbCol, csvCol]) => {
+    row[csvCol] = dbRow[dbCol] !== null && dbRow[dbCol] !== undefined ? dbRow[dbCol] : '';
+  });
+  return row;
+}
+
+// ======================== SUPABASE OPERATIONS ========================
+async function supaFetch(path, options = {}){
+  const res = await fetch(SUPABASE_URL + '/rest/v1/' + path, {
+    headers: supabaseHeaders,
+    ...options
+  });
+  return res;
+}
+
+async function loadAllData(){
+  showToast('Loading data from server...');
+  try {
+    // Supabase paginates at 1000 by default, use range headers for more
+    let allRows = [];
+    let from = 0;
+    const pageSize = 1000;
+    while(true){
+      const res = await fetch(SUPABASE_URL + '/rest/v1/project_lines?select=*&order=fecha_creacion.asc', {
+        headers: {
+          ...supabaseHeaders,
+          'Range': from + '-' + (from + pageSize - 1)
+        }
+      });
+      const rows = await res.json();
+      if(!Array.isArray(rows) || rows.length === 0) break;
+      allRows = allRows.concat(rows);
+      if(rows.length < pageSize) break;
+      from += pageSize;
+    }
+    DATA = allRows.map(toDisplayRow);
+    document.getElementById('lastUpdate').textContent = DATA.length + ' records';
+    buildFilters();
+    render();
+    if(DATA.length > 0) showToast(DATA.length + ' records loaded');
+    else showToast('No data yet — upload your first CSV');
+  } catch(e){
+    console.error('Supabase load error:', e);
+    showToast('Error connecting to server — using local data');
+    const stored = loadFromStorage();
+    if(stored){ DATA = stored; document.getElementById('lastUpdate').textContent = DATA.length + ' records'; }
+    buildFilters();
+    render();
+  }
+}
+
+async function upsertRows(csvRows){
+  // Supabase upsert: insert or update on conflict (case_number, item)
+  const dbRows = csvRows.map(toSupabaseRow);
+  const batchSize = 500;
+  let totalUpserted = 0;
+  
+  for(let i = 0; i < dbRows.length; i += batchSize){
+    const batch = dbRows.slice(i, i + batchSize);
+    const res = await fetch(SUPABASE_URL + '/rest/v1/project_lines', {
+      method: 'POST',
+      headers: {
+        ...supabaseHeaders,
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
+      },
+      body: JSON.stringify(batch)
+    });
+    if(!res.ok){
+      const err = await res.text();
+      console.error('Upsert error:', err);
+      showToast('Error saving batch — check console');
+      return false;
+    }
+    totalUpserted += batch.length;
+  }
+  return totalUpserted;
+}
+
+async function replaceAllData(csvRows){
+  // Delete all existing rows then insert new ones
+  const delRes = await fetch(SUPABASE_URL + '/rest/v1/project_lines?id=gt.0', {
+    method: 'DELETE',
+    headers: supabaseHeaders
+  });
+  if(!delRes.ok){
+    showToast('Error clearing data');
+    return false;
+  }
+  return await upsertRows(csvRows);
+}
+
 // ======================== CSV PROCESSING ========================
 function normalizeRow(r){
   const row = {};
@@ -425,18 +560,6 @@ function normalizeRow(r){
 
 function getRowKey(r){ return (r['Case #']||'') + '||' + (r['Item']||''); }
 
-function mergeData(existingData, newRows){
-  const map = new Map();
-  existingData.forEach(r => map.set(getRowKey(r), r));
-  let added = 0, updated = 0;
-  newRows.forEach(r => {
-    const key = getRowKey(r);
-    if(map.has(key)){ map.set(key, r); updated++; }
-    else { map.set(key, r); added++; }
-  });
-  return { data: Array.from(map.values()), added, updated };
-}
-
 function saveToStorage(){ 
   try { localStorage.setItem('dashboard_avances_data', JSON.stringify(DATA)); } catch(e){} 
 }
@@ -449,27 +572,53 @@ function loadFromStorage(){
   return null;
 }
 
-function handleCSV(file, mode){
+function isSupabaseConfigured(){
+  return SUPABASE_URL !== 'YOUR_SUPABASE_URL' && SUPABASE_KEY !== 'YOUR_SUPABASE_ANON_KEY';
+}
+
+async function handleCSV(file, mode){
   Papa.parse(file, {
     header: true,
     skipEmptyLines: true,
-    complete: function(results){
+    complete: async function(results){
       if(!results.data || results.data.length === 0) return;
       const newRows = results.data.map(normalizeRow);
 
-      if(mode === 'replace'){
-        DATA = newRows;
-        showToast(`Replaced: ${DATA.length} records loaded`);
+      if(isSupabaseConfigured()){
+        // ---- SUPABASE MODE ----
+        showToast('Saving to server...');
+        let count;
+        if(mode === 'replace'){
+          count = await replaceAllData(newRows);
+          if(count !== false) showToast('Replaced: ' + count + ' records saved to server');
+        } else {
+          count = await upsertRows(newRows);
+          if(count !== false) showToast('Merged: ' + count + ' records synced to server');
+        }
+        // Reload everything from server to get the complete state
+        await loadAllData();
       } else {
-        const result = mergeData(DATA, newRows);
-        DATA = result.data;
-        showToast(`Merged: ${result.added} added, ${result.updated} updated — ${DATA.length} total`);
+        // ---- LOCAL MODE (fallback) ----
+        if(mode === 'replace'){
+          DATA = newRows;
+          showToast('Replaced: ' + DATA.length + ' records (local only)');
+        } else {
+          const map = new Map();
+          DATA.forEach(r => map.set(getRowKey(r), r));
+          let added = 0, updated = 0;
+          newRows.forEach(r => {
+            const key = getRowKey(r);
+            if(map.has(key)){ map.set(key, r); updated++; }
+            else { map.set(key, r); added++; }
+          });
+          DATA = Array.from(map.values());
+          showToast('Merged: ' + added + ' added, ' + updated + ' updated — ' + DATA.length + ' total (local only)');
+        }
+        saveToStorage();
+        document.getElementById('lastUpdate').textContent = DATA.length + ' records';
+        buildFilters();
+        render();
       }
-
-      saveToStorage();
-      document.getElementById('lastUpdate').textContent = DATA.length + ' records';
-      buildFilters();
-      render();
     }
   });
 }
@@ -507,10 +656,16 @@ function showToast(msg){
 }
 
 // ======================== INIT ========================
-const stored = loadFromStorage();
-if(stored){ DATA = stored; document.getElementById('lastUpdate').textContent = DATA.length + ' records'; }
-buildFilters();
-render();
+if(isSupabaseConfigured()){
+  loadAllData();
+} else {
+  // No Supabase yet — use embedded data + localStorage
+  const stored = loadFromStorage();
+  if(stored){ DATA = stored; document.getElementById('lastUpdate').textContent = DATA.length + ' records'; }
+  buildFilters();
+  render();
+  console.log('Supabase not configured — running in local mode. Edit SUPABASE_URL and SUPABASE_KEY to enable cloud sync.');
+}
 </script>
 </body>
 </html>
