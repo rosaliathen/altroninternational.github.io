@@ -690,8 +690,8 @@ function cleanDate(v){
       // Second number > 12 → MUST be MM/DD/YYYY (e.g. 10/18/2025)
       month = a; day = b;
     } else {
-      // Ambiguous (both ≤ 12) → default MM/DD/YYYY (Excel US format)
-      month = a; day = b;
+      // Ambiguous (both ≤ 12) → default DD/MM/YYYY (formato dominicano)
+      day = a; month = b;
     }
     return year + '-' + String(month).padStart(2,'0') + '-' + String(day).padStart(2,'0');
   }
