@@ -786,7 +786,17 @@ function handleCSV(file, mode){
     
     console.log('Parsed', results.data.length, 'rows. Delimiter:', JSON.stringify(results.meta.delimiter), 'Fields:', results.meta.fields);
     
-    const newRows = results.data.map(normalizeRow);
+    const allRows = results.data.map(normalizeRow);
+
+    // Eliminate duplicates based on composite key: id_project + item
+    const seen = new Set();
+    const newRows = allRows.filter(row => {
+      const key = (row['ID Project + Case #'] || '') + '|' + (row['Item'] || '');
+      if(seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    console.log('Rows after dedup:', newRows.length, '(removed', allRows.length - newRows.length, 'duplicates)');
     console.log('Sample cleaned row:', JSON.stringify(newRows[0]));
 
     if(isSupabaseConfigured()){
