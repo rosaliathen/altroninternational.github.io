@@ -219,14 +219,14 @@ const count = (arr,k,v) => arr.filter(r=>r[k]===v).length;
 const distinctCount = (arr,k) => new Set(arr.map(r=>r[k]).filter(Boolean)).size;
 
 const STATUS_META = {
-  'Presupuesto entregado a cliente':{color:'#22C55E',order:1},
-  'Cotización a cliente preparada':{color:'#10B981',order:2},
-  'Precio aprobado (revisión interna CEO)':{color:'#3B82F6',order:3},
-  'Analizado y costeado':{color:'#6366F1',order:4},
-  'RFQ / RFP cotizado por proveedor':{color:'#8B5CF6',order:5},
-  'RFQ / RFP enviado a proveedor':{color:'#F59E0B',order:6},
-  'RFQ / RFP preparado para enviar a proveedor':{color:'#F97316',order:7},
-  'Informacion incompleta':{color:'#EF4444',order:8}
+  'Presupuesto entregado a cliente':              {color:'#22C55E', order:1, pct:1.00},
+  'Cotización a cliente preparada':               {color:'#10B981', order:2, pct:0.88},
+  'Precio aprobado (revisión interna CEO)':        {color:'#3B82F6', order:3, pct:0.75},
+  'Analizado y costeado':                          {color:'#6366F1', order:4, pct:0.63},
+  'RFQ / RFP cotizado por proveedor':              {color:'#8B5CF6', order:5, pct:0.50},
+  'RFQ / RFP enviado a proveedor':                 {color:'#F59E0B', order:6, pct:0.38},
+  'RFQ / RFP preparado para enviar a proveedor':   {color:'#F97316', order:7, pct:0.25},
+  'Informacion incompleta':                        {color:'#EF4444', order:8, pct:0.13}
 };
 
 // ======================== FILTERS ========================
@@ -282,17 +282,19 @@ function renderKPIs(d){
   const margenReal = pvReal > 0 ? (pvReal-ccReal)/pvReal : 0;
   const avgAge = d.length ? (d.reduce((a,r)=>a+(parseFloat(r['Antigüedad'])||0),0)/d.length) : 0;
 
-  const deliveredCount = d.filter(r => {
-    const s = r['Status de linea'];
-    return s === 'Presupuesto entregado a cliente' || s === 'Cotización a cliente preparada';
-  }).length;
+  const totalPct = d.reduce((sum, r) => {
+    const meta = STATUS_META[r['Status de linea']];
+    return sum + (meta ? meta.pct : 0);
+  }, 0);
+  const avgProgress = d.length ? totalPct / d.length : 0;
+  const deliveredCount = d.filter(r => r['Status de linea'] === 'Presupuesto entregado a cliente').length;
 
   document.getElementById('kpis').innerHTML = `
     <div class="kpi"><div class="kpi-label">Total Cases</div><div class="kpi-value">${distinctCount(d,'ID Project + Case #')}</div><div class="kpi-sub">${distinctCount(d,'Oportunidad')} opportunities · ${d.length} lines</div></div>
     <div class="kpi"><div class="kpi-label">Total PV</div><div class="kpi-value">${fmt$(totalPV)}</div><div class="kpi-sub">Cost: ${fmt$(totalCC)}</div></div>
     <div class="kpi"><div class="kpi-label">Real Margin %</div><div class="kpi-value" style="color:${margenReal>=0?'var(--green)':'var(--red)'}">${fmtPct(margenReal)}</div><div class="kpi-sub">${d.length - withPV.length} lines without PV</div></div>
     <div class="kpi"><div class="kpi-label">Avg Age</div><div class="kpi-value">${Math.round(avgAge)} days</div><div class="kpi-sub">${d.length} records</div></div>
-    <div class="kpi"><div class="kpi-label">Pipeline Progress</div><div class="kpi-value">${fmtPct(deliveredCount/Math.max(d.length,1))}</div><div class="kpi-sub">${deliveredCount} delivered of ${d.length}</div></div>
+    <div class="kpi"><div class="kpi-label">Pipeline Progress</div><div class="kpi-value">${fmtPct(avgProgress)}</div><div class="kpi-sub">${deliveredCount} fully delivered of ${d.length}</div></div>
   `;
 }
 
