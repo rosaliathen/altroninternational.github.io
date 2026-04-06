@@ -628,7 +628,13 @@ async function upsertRows(csvRows){
   const valid = csvRows.filter(r => r['ID Project + Case #'] && String(r['ID Project + Case #']).trim() !== '');
   if(valid.length < csvRows.length)
     console.warn('Skipped ' + (csvRows.length - valid.length) + ' rows with empty ID Project + Case #');
-  const dbRows = valid.map(toSupabaseRow);
+  const allDbRows = valid.map(toSupabaseRow);
+  // Deduplicate by (id_project, linea_num) — keeps last occurrence if hash collides
+  const seen = new Map();
+  allDbRows.forEach(r => seen.set(r.id_project + '|' + r.linea_num, r));
+  const dbRows = Array.from(seen.values());
+  if(dbRows.length < allDbRows.length)
+    console.warn('Deduped ' + (allDbRows.length - dbRows.length) + ' duplicate rows within upload');
   console.log('Upsert: ' + dbRows.length + ' rows prepared. Sample:', JSON.stringify(dbRows[0]));
   const batchSize = 500;
   let totalUpserted = 0;
@@ -727,17 +733,26 @@ function cleanDate(v){
 // Generates a stable numeric ID from row content so the same row always
 // gets the same linea_num regardless of which file it came from.
 function rowContentHash(csvRow) {
+  // Use all identifying fields to minimize collisions
   const str = [
-    String(csvRow['ID Project + Case #'] || '').trim(),
-    String(csvRow['Descripcion']          || '').trim(),
-    String(csvRow['Item']                 || '').trim(),
-    String(csvRow['Cantidad']             || '').trim(),
+    String(csvRow['ID Project + Case #']          || '').trim(),
+    String(csvRow['Descripcion']                   || '').trim(),
+    String(csvRow['Item']                          || '').trim(),
+    String(csvRow['Cantidad']                      || '').trim(),
+    String(csvRow['Fecha creacion']                || '').trim(),
+    String(csvRow['Incoterm']                      || '').trim(),
+    String(csvRow['Categoria']                     || '').trim(),
+    String(csvRow['Oportunidad']                   || '').trim(),
   ].join('\x00');
-  let h = 5381;
+  // Two independent djb2 hashes combined → 64-bit space, then folded to signed 32-bit
+  let h1 = 5381, h2 = 52711;
   for (let i = 0; i < str.length; i++) {
-    h = Math.imul(h, 33) ^ str.charCodeAt(i);
+    const c = str.charCodeAt(i);
+    h1 = Math.imul(h1, 33) ^ c;
+    h2 = Math.imul(h2, 31) ^ c;
   }
-  return Math.abs(h | 0) || 1; // signed 32-bit positive, fits PostgreSQL integer
+  const combined = (h1 ^ Math.imul(h2, 0x9e3779b9)) | 0;
+  return Math.abs(combined) || 1;
 }
 
 function normalizeRow(r){
