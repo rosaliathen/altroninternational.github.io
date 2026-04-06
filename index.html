@@ -564,6 +564,7 @@ function toSupabaseRow(csvRow){
     else row[dbCol] = String(v).trim();
   });
   if(row.empresa === 'A Int.') row.empresa = 'A. Int';
+  if(csvRow._linea_num !== undefined) row.linea_num = csvRow._linea_num;
   return row;
 }
 
@@ -621,7 +622,11 @@ async function loadAllData(){
 }
 
 async function upsertRows(csvRows){
-  const dbRows = csvRows.map(toSupabaseRow);
+  // Drop rows missing id_project — Supabase has NOT NULL constraint on it
+  const valid = csvRows.filter(r => r['ID Project + Case #'] && String(r['ID Project + Case #']).trim() !== '');
+  if(valid.length < csvRows.length)
+    console.warn('Skipped ' + (csvRows.length - valid.length) + ' rows with empty ID Project + Case #');
+  const dbRows = valid.map(toSupabaseRow);
   console.log('Upsert: ' + dbRows.length + ' rows prepared. Sample:', JSON.stringify(dbRows[0]));
   const batchSize = 500;
   let totalUpserted = 0;
@@ -629,7 +634,7 @@ async function upsertRows(csvRows){
   for(let i = 0; i < dbRows.length; i += batchSize){
     const batch = dbRows.slice(i, i + batchSize);
     try {
-      const res = await fetch(SUPABASE_URL + '/rest/v1/project_lines?on_conflict=id_project,item', {
+      const res = await fetch(SUPABASE_URL + '/rest/v1/project_lines?on_conflict=id_project,linea_num', {
         method: 'POST',
         headers: {
           ...supabaseHeaders,
@@ -786,17 +791,11 @@ function handleCSV(file, mode){
     
     console.log('Parsed', results.data.length, 'rows. Delimiter:', JSON.stringify(results.meta.delimiter), 'Fields:', results.meta.fields);
     
-    const allRows = results.data.map(normalizeRow);
-
-    // Eliminate duplicates based on composite key: id_project + item
-    const seen = new Set();
-    const newRows = allRows.filter(row => {
-      const key = (row['ID Project + Case #'] || '') + '|' + (row['Item'] || '');
-      if(seen.has(key)) return false;
-      seen.add(key);
-      return true;
+    const newRows = results.data.map((r, i) => {
+      const row = normalizeRow(r);
+      row._linea_num = i + 1; // 1-based line number within this CSV upload
+      return row;
     });
-    console.log('Rows after dedup:', newRows.length, '(removed', allRows.length - newRows.length, 'duplicates)');
     console.log('Sample cleaned row:', JSON.stringify(newRows[0]));
 
     if(isSupabaseConfigured()){
