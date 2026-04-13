@@ -247,6 +247,7 @@ function buildFilters(){
     const sel = document.createElement('select');
     sel.className = 'filter-select';
     sel.dataset.key = f.key;
+    sel.dataset.label = f.label;
     sel.innerHTML = `<option value="">All — ${f.label}</option>` +
       unique(DATA,f.key).map(v=>`<option value="${v}">${v}</option>`).join('');
     sel.addEventListener('change', render);
