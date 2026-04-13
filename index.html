@@ -313,12 +313,16 @@ function renderKPIs(d){
   const avgProgress = d.length ? totalPct / d.length : 0;
   const deliveredCount = d.filter(r => r['Status de linea'] === 'Presupuesto entregado a cliente').length;
 
+  const markup = ccReal > 0 ? (pvReal - ccReal) / ccReal : 0;
+  const markupColor = markup >= 0 ? '#06B6D4' : 'var(--red)';
+
   document.getElementById('kpis').innerHTML = `
     <div class="kpi"><div class="kpi-label">Total Cases</div><div class="kpi-value">${distinctCount(d,'ID Project + Case #')}</div><div class="kpi-sub">${distinctCount(d,'Oportunidad')} opportunities · ${d.length} lines</div></div>
     <div class="kpi"><div class="kpi-label">Total PV</div><div class="kpi-value">${fmt$(totalPV)}</div><div class="kpi-sub">Cost: ${fmt$(totalCC)}</div></div>
     <div class="kpi"><div class="kpi-label">Real Margin %</div><div class="kpi-value" style="color:${margenReal>=0?'var(--green)':'var(--red)'}">${fmtPct(margenReal)}</div><div class="kpi-sub">${d.length - withPV.length} lines without PV</div></div>
     <div class="kpi"><div class="kpi-label">Avg Age</div><div class="kpi-value">${Math.round(avgAge)} days</div><div class="kpi-sub">${d.length} records</div></div>
     <div class="kpi"><div class="kpi-label">Pipeline Progress</div><div class="kpi-value">${fmtPct(avgProgress)}</div><div class="kpi-sub">${deliveredCount} fully delivered of ${d.length}</div></div>
+    <div class="kpi"><div class="kpi-label">Variación PV / Costo</div><div class="kpi-value" style="color:${markupColor}">${fmtPct(markup)}</div><div class="kpi-sub">PV ${fmt$(pvReal)} vs Costo ${fmt$(ccReal)}</div></div>
   `;
 }
 
