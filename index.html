@@ -625,10 +625,14 @@ async function loadAllData(){
 }
 
 async function upsertRows(csvRows){
-  // Drop rows missing id_project — Supabase has NOT NULL constraint on it
-  const valid = csvRows.filter(r => r['ID Project + Case #'] && String(r['ID Project + Case #']).trim() !== '');
+  // Drop rows missing id_project or item — Supabase requires both
+  const valid = csvRows.filter(r => {
+    const hasProject = r['ID Project + Case #'] && String(r['ID Project + Case #']).trim() !== '';
+    const hasItem    = r['Item'] && String(r['Item']).trim() !== '';
+    return hasProject && hasItem;
+  });
   if(valid.length < csvRows.length)
-    console.warn('Skipped ' + (csvRows.length - valid.length) + ' rows with empty ID Project + Case #');
+    console.warn('Skipped ' + (csvRows.length - valid.length) + ' rows with empty ID Project or Item');
   const allDbRows = valid.map(toSupabaseRow);
   // Deduplicate by (id_project, linea_num) — keeps last occurrence if hash collides
   const seen = new Map();
